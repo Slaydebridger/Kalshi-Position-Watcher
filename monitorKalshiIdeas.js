@@ -35,5 +35,9 @@ async function sendWebhookEmbed() {
     body: JSON.stringify(payload)
   });
 
-  if (!res.ok) {
-    console.error("Discord webhook error:", res.status, awai
+if (!res.ok) {
+  console.error("Discord webhook error:", res.status, await res.text());
+} else {
+  console.log("Test embed sent to Discord successfully.");
+}
+
