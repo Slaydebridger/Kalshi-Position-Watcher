@@ -18,11 +18,11 @@ const PROFILES = [
 const TRADER_STYLES = {
   PredMTrader: {
     color: 0x00ff7f, // light green
-    emoji: "🧠"
+    emoji: "💭"
   },
   TheGrandeTop10: {
     color: 0x1e90ff, // blue
-    emoji: "🏆"
+    emoji: "🎵"
   }
 };
 
