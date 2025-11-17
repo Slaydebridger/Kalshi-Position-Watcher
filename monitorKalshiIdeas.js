@@ -1,98 +1,113 @@
-// monitorKalshiIdeas.js
-// Multi-trader test: sends one Discord embed for each trader
-// so you can see different colors/emojis and confirm styling.
-// NEXT step after this will be wiring in real Kalshi data.
+import crypto from "crypto";
+import fs from "fs";
 
+// Profiles to monitor
 const PROFILES = [
   {
     name: "PredMTrader",
-    profileUrl: "https://kalshi.com/ideas/profiles/PredMTrader"
+    url: "https://kalshi.com/ideas/profiles/PredMTrader",
+    emoji: "💭",
+    color: 0x00ff7f,
+    stateKey: "pred",
   },
   {
     name: "TheGrandeTop10",
-    profileUrl: "https://kalshi.com/ideas/profiles/TheGrandeTop10"
+    url: "https://kalshi.com/ideas/profiles/TheGrandeTop10",
+    emoji: "🎵",
+    color: 0x1e90ff,
+    stateKey: "grande",
   }
 ];
 
-// Per-trader style (colors are in hex)
-const TRADER_STYLES = {
-  PredMTrader: {
-    color: 0x00ff7f, // light green
-    emoji: "💭"
-  },
-  TheGrandeTop10: {
-    color: 0x1e90ff, // blue
-    emoji: "🎵"
+// Load previous state
+function loadState() {
+  try {
+    return JSON.parse(fs.readFileSync("state.json", "utf-8"));
+  } catch {
+    return {};
   }
-};
+}
 
-async function sendWebhookEmbedForTrader(traderProfile) {
+// Save state
+function saveState(state) {
+  fs.writeFileSync("state.json", JSON.stringify(state, null, 2));
+}
+
+// Send Discord embed
+async function sendDiscordEmbed(profile) {
   const webhookUrl = process.env.WEBHOOK_URL;
-
-  if (!webhookUrl) {
-    console.error("WEBHOOK_URL is not set. Make sure to add it as a GitHub secret.");
-    return;
-  }
-
-  const style = TRADER_STYLES[traderProfile.name] || {};
-  const emoji = style.emoji || "📊";
-  const color = style.color ?? 0x58a6ff; // default blue-ish
-
-  // Fake "position" data for now – just to test styling & multiple embeds
-  const fakePosition = {
-    market: "FAKE POSITION – next step will use real Kalshi data.",
-    marketUrl: traderProfile.profileUrl,
-    side: traderProfile.name === "PredMTrader" ? "YES" : "NO",
-    size: traderProfile.name === "PredMTrader" ? "250 contracts" : "150 contracts",
-    time: "just now (test)"
-  };
 
   const payload = {
     embeds: [
       {
-        title: `${emoji} New Kalshi Position (TEST) – ${traderProfile.name}`,
-        url: fakePosition.marketUrl,
-        color,
+        title: `${profile.emoji} Change Detected for ${profile.name}`,
+        url: profile.url,
+        color: profile.color,
         fields: [
-          { name: "👤 Trader", value: traderProfile.name, inline: true },
-          { name: "📊 Side", value: fakePosition.side, inline: true },
-          { name: "📦 Size", value: fakePosition.size, inline: true },
-          { name: "📈 Market", value: fakePosition.market },
-          { name: "🔗 Profile", value: traderProfile.profileUrl },
-          { name: "⏱ Detected", value: fakePosition.time }
+          { name: "Trader", value: profile.name, inline: true },
+          { name: "Profile Link", value: profile.url },
+          { name: "Detected At", value: new Date().toISOString() }
         ]
       }
     ]
   };
 
-  const res = await fetch(webhookUrl, {
+  await fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
-
-  if (!res.ok) {
-    console.error(
-      `Discord webhook error for ${traderProfile.name}:`,
-      res.status,
-      await res.text()
-    );
-  } else {
-    console.log(`Test embed sent for ${traderProfile.name}.`);
-  }
 }
 
+// Extract relevant content from HTML
+function extractContent(html) {
+  // We focus on the main profile content area
+  const start = html.indexOf("<main");
+  const end = html.indexOf("</main>");
+  if (start === -1 || end === -1) return html;
+  return html.substring(start, end + 7);
+}
+
+// Compute hash
+function computeHash(content) {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+// Main logic
 async function main() {
-  console.log("Running multi-trader test…");
+  const state = loadState();
 
   for (const profile of PROFILES) {
-    await sendWebhookEmbedForTrader(profile);
+    console.log(`Checking: ${profile.name}`);
+
+    const res = await fetch(profile.url);
+    const html = await res.text();
+
+    const content = extractContent(html);
+    const hash = computeHash(content);
+
+    const prevHash = state[profile.stateKey];
+
+    if (!prevHash) {
+      // First run, save baseline
+      state[profile.stateKey] = hash;
+      console.log(`Saved initial baseline for ${profile.name}`);
+      continue;
+    }
+
+    if (prevHash !== hash) {
+      console.log(`Change detected for ${profile.name}!`);
+      await sendDiscordEmbed(profile);
+      state[profile.stateKey] = hash;
+    } else {
+      console.log(`No change detected for ${profile.name}`);
+    }
   }
 
-  console.log("Done sending test embeds.");
+  saveState(state);
 }
 
-main().catch((err) => {
-  console.error("Error in script:", err);
+main().catch(err => {
+  console.error("Error:", err);
   process.exit(1);
 });
