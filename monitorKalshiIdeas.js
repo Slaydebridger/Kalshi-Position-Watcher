@@ -1,8 +1,5 @@
 // monitorKalshiIdeas.js
-// Test version: just sends a Discord embed to confirm everything works.
-// Later, we'll replace this with code that actually tracks:
-// - https://kalshi.com/ideas/profiles/PredMTrader
-// - https://kalshi.com/ideas/profiles/TheGrandeTop10
+// Test version: sends a Discord embed to make sure webhook + Actions work.
 
 async function sendWebhookEmbed() {
   const webhookUrl = process.env.WEBHOOK_URL;
@@ -22,7 +19,10 @@ async function sendWebhookEmbed() {
           { name: "👤 Trader", value: "PredMTrader", inline: true },
           { name: "📊 Side", value: "YES", inline: true },
           { name: "📦 Size", value: "123 contracts", inline: true },
-          { name: "📈 Market", value: "This is just a test embed to confirm the bot is working." },
+          {
+            name: "📈 Market",
+            value: "This is just a test embed to confirm the bot is working."
+          },
           { name: "🔗 Profile", value: "https://kalshi.com/ideas/profiles/PredMTrader" }
         ]
       }
@@ -35,9 +35,19 @@ async function sendWebhookEmbed() {
     body: JSON.stringify(payload)
   });
 
-if (!res.ok) {
-  console.error("Discord webhook error:", res.status, await res.text());
-} else {
-  console.log("Test embed sent to Discord successfully.");
+  if (!res.ok) {
+    console.error("Discord webhook error:", res.status, await res.text());
+  } else {
+    console.log("Test embed sent to Discord successfully.");
+  }
 }
 
+async function main() {
+  console.log("Running monitorKalshiIdeas.js (test mode)...");
+  await sendWebhookEmbed();
+}
+
+main().catch((err) => {
+  console.error("Error in script:", err);
+  process.exit(1);
+});
